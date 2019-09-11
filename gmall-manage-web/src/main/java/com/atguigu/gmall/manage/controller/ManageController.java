@@ -1,10 +1,7 @@
 package com.atguigu.gmall.manage.controller;
 
 import com.alibaba.dubbo.config.annotation.Reference;
-import com.atguigu.gmall.bean.BaseAttrInfo;
-import com.atguigu.gmall.bean.BaseCatalog1;
-import com.atguigu.gmall.bean.BaseCatalog2;
-import com.atguigu.gmall.bean.BaseCatalog3;
+import com.atguigu.gmall.bean.*;
 import com.atguigu.gmall.service.ManageService;
 import org.springframework.web.bind.annotation.*;
 
@@ -17,29 +14,88 @@ public class ManageController {
     @Reference
     private ManageService manageService;
 
+    /**
+     * 获取所有一级分类数据
+     *
+     * @return
+     */
     @PostMapping("/getCatalog1")
-    public List<BaseCatalog1> getCatalog1(){
+    public List<BaseCatalog1> getCatalog1() {
         return manageService.getBaseCatalog1();
     }
 
+    /**
+     * 根据一级分类Id查询所有二级分类
+     *
+     * @param catalog1Id 一级分类Id
+     * @return
+     */
     @PostMapping("/getCatalog2")
-    public List<BaseCatalog2> getCatalog2(String catalog1Id){
+    public List<BaseCatalog2> getCatalog2(String catalog1Id) {
         return manageService.getBaseCatalog2(catalog1Id);
     }
 
+    /**
+     * 根据二级分类Id查询所有三级分类
+     *
+     * @param catalog2Id 二级分类Id
+     * @return
+     */
     @PostMapping("/getCatalog3")
-    public List<BaseCatalog3> getCatalog3(String catalog2Id){
+    public List<BaseCatalog3> getCatalog3(String catalog2Id) {
         return manageService.getBaseCatalog3(catalog2Id);
     }
 
+    /**
+     * 根据三级分类Id查询平台属性集合
+     *
+     * @param catalog3Id 三级分类Id
+     * @return
+     */
     @GetMapping("/attrInfoList")
-    public List<BaseAttrInfo> attrInfoList(String catalog3Id){
+    public List<BaseAttrInfo> attrInfoList(String catalog3Id) {
         return manageService.getAttrList(catalog3Id);
     }
 
+    /**
+     * 保存或修改平台属性数据
+     *
+     * @param baseAttrInfo 平台属性对象
+     * @return
+     */
     @PostMapping("/saveAttrInfo")
-    public void saveAttrInfo(@RequestBody BaseAttrInfo baseAttrInfo){
+    public String saveAttrInfo(@RequestBody BaseAttrInfo baseAttrInfo) {
         manageService.saveAttrInfo(baseAttrInfo);
+        return "success";
+    }
+
+    /**
+     * 根据平台属性id查询平台属性值集合
+     * @param attrId 平台属性id
+     * @return
+     */
+//    @PostMapping("/getAttrValueList")
+//    public List<BaseAttrValue> getAttrValueList(String attrId){
+//        return manageService.getAttrValueList(attrId);
+//    }
+
+    /**
+     * 根据平台属性id查询平台属性对象
+     *
+     * @param attrId 平台属性id
+     * @return
+     */
+    @PostMapping("/getAttrValueList")
+    private List<BaseAttrValue> getAttrValueList(String attrId) {
+        //先通过attrId查询平台属性
+        BaseAttrInfo baseAttrInfo = manageService.getAttrInfo(attrId);
+        //返回平台属性中的属性集合
+        return baseAttrInfo.getAttrValueList();
+    }
+
+    @PostMapping("/baseSaleAttrList")
+    public List<BaseSaleAttr> baseSaleAttrList() {
+        return manageService.baseSaleAttrList();
     }
 
 }
