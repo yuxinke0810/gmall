@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper SYSTEM "http://mybatis.org/dtd/mybatis-3-mapper.dtd" >
+<!--namespace:表示接口的全路径-->
+<mapper namespace="com.atguigu.gmall.manage.mapper.SpuSaleAttrMapper">
+    <!--
+        resultMap:返回结果集
+        id:表示唯一标识
+        type:返回结果集数据类型
+        autoMapping:自动映射
+    -->
+    <resultMap id="spuSaleAttrMap" type="com.atguigu.gmall.bean.SpuSaleAttr" autoMapping="true">
+        <!--
+            id:表示主键
+            property:表示实体类的属性名
+            column:表示表中的字段名
+        -->
+        <id property="id" column="id"></id>
+
+        <!--
+            result:普通字段
+        -->
+        <!--<result></result>-->
+
+        <!--mybatis配置一对多-->
+        <!--
+            property:表示实体类的属性名
+            ofType:返回集合的属性对象
+        -->
+        <collection property="spuSaleAttrValueList" ofType="com.atguigu.gmall.bean.SpuSaleAttrValue" autoMapping="true">
+            <id property="id" column="sale_attr_value_id"></id>
+        </collection>
+        <!--多对一-->
+        <!--<association property=""></association>-->
+    </resultMap>
+    <!--id:方法名称-->
+    <select id="selectSpuSaleAttrList" resultMap="spuSaleAttrMap">
+        SELECT
+            ssa.id,
+            ssa.spu_id,
+            ssa.sale_attr_name,
+            ssa.sale_attr_id,
+            ssav.id sale_attr_value_id,
+            ssav.sale_attr_value_name
+        FROM
+            spu_sale_attr ssa
+        INNER JOIN
+            spu_sale_attr_value ssav
+        ON
+            ssa.sale_attr_id=ssav.sale_attr_id
+        AND
+            ssa.spu_id=ssav.spu_id
+        WHERE
+            ssa.spu_id=#{spu_id}
+    </select>
+</mapper>
