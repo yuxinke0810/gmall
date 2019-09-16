@@ -24,8 +24,8 @@ public class FileUploadController {
     /**
      * 上传文件
      * 获取上传文件，需要使用SpringMVC技术
-     * @param file
-     * @return
+     * @param file 文件
+     * @return 图片路径地址
      */
     @PostMapping("/fileUpload")
     public String fileUpload(MultipartFile file){
