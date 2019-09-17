@@ -1,10 +1,16 @@
 package com.atguigu.gmall.manage.service.impl;
 
 import com.alibaba.dubbo.config.annotation.Service;
+import com.alibaba.fastjson.JSON;
 import com.atguigu.gmall.bean.*;
 import com.atguigu.gmall.config.RedisUtil;
+import com.atguigu.gmall.manage.constant.ManageConst;
 import com.atguigu.gmall.manage.mapper.*;
 import com.atguigu.gmall.service.ManageService;
+import org.redisson.Redisson;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
 import redis.clients.jedis.Jedis;
@@ -12,6 +18,7 @@ import redis.clients.jedis.Jedis;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 @Service
 public class ManageServiceImpl implements ManageService {
@@ -63,6 +70,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 获取所有一级分类数据
+     *
      * @return
      */
     @Override
@@ -72,6 +80,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据一级分类Id查询所有二级分类
+     *
      * @param catalog1Id 一级分类Id
      * @return
      */
@@ -87,6 +96,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据二级分类Id查询所有三级分类
+     *
      * @param catalog2Id 二级分类Id
      * @return
      */
@@ -99,6 +109,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据三级分类Id查询平台属性集合
+     *
      * @param catalog3Id 三级分类Id
      * @return
      */
@@ -112,6 +123,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 保存或修改平台属性数据
+     *
      * @param baseAttrInfo
      */
     @Transactional
@@ -143,6 +155,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据平台属性id查询平台属性值集合
+     *
      * @param attrId 平台属性id
      * @return
      */
@@ -166,6 +179,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据spuInfo对象属性获取spuInfo集合
+     *
      * @param spuInfo 对象属性
      * @return
      */
@@ -176,6 +190,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 获取所有销售属性数据
+     *
      * @return
      */
     @Override
@@ -185,6 +200,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 保存spuInfo
+     *
      * @param spuInfo
      */
     @Override
@@ -227,6 +243,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据sup图片对象获取spu图片集合
+     *
      * @param spuImage sup图片对象
      * @return
      */
@@ -237,6 +254,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据spuId获取销售属性集合
+     *
      * @param spuId
      * @return
      */
@@ -247,6 +265,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 保存skuInfo数据
+     *
      * @param skuInfo
      */
     @Override
@@ -286,16 +305,120 @@ public class ManageServiceImpl implements ManageService {
     }
 
     /**
-     * 根据skuId查询skuInfo
+     * 根据skuId从redis中查询skuInfo
+     *
      * @param skuId
      * @return
      */
     @Override
     public SkuInfo getSkuInfo(String skuId) {
-        Jedis jedis = redisUtil.getJedis();
-        jedis.set("111", "123");
-        jedis.close();
+        return getSkuInfoRedisson(skuId);
+        //return getSkuInfoJedis(skuId);
+    }
 
+    /**
+     * 根据skuId从redis中查询skuInfo Redisson锁
+     *
+     * @param skuId
+     * @return
+     */
+    private SkuInfo getSkuInfoRedisson(String skuId) {
+        Config config = new Config();
+        config.useSingleServer().setAddress("redis://192.168.187.130:6379");
+        RedissonClient redissonClient = Redisson.create(config);
+        //使用Redisson调用getLock
+        RLock lock = redissonClient.getLock("myLock");
+        //加锁
+        lock.lock(10, TimeUnit.SECONDS);
+        Jedis jedis = null;
+        SkuInfo skuInfo = null;
+        try {
+            //获取jedis
+            jedis = redisUtil.getJedis();
+            //定义key
+            String skuKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKUKEY_SUFFIX;
+            //判断redis中是否有key
+            if (jedis.exists(skuKey)) {
+                //如果有从缓存中获取
+                String skuJson = jedis.get(skuKey);
+                skuInfo = JSON.parseObject(skuJson, SkuInfo.class);
+                return skuInfo;
+            } else {
+                //如果没有从db获取并将数据放入缓存 并设置过期时间
+                skuInfo = getSkuInfoDB(skuId);
+                jedis.setex(skuKey, ManageConst.SKUKEY_TIMEOUT, JSON.toJSONString(skuInfo));
+                return skuInfo;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (jedis != null) {
+                jedis.close();
+            }
+            //解锁
+            lock.unlock();
+        }
+        return getSkuInfoDB(skuId);
+    }
+
+    /**
+     * 根据skuId从redis中查询skuInfo Jedis锁
+     *
+     * @param skuId
+     * @return
+     */
+    private SkuInfo getSkuInfoJedis(String skuId) {
+        Jedis jedis = null;
+        SkuInfo skuInfo = null;
+        try {
+            //获取jedis
+            jedis = redisUtil.getJedis();
+            //定义key
+            String skuKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKUKEY_SUFFIX;
+            //获取数据
+            String skuJson = jedis.get(skuKey);
+            if (skuJson == null || skuJson.length() == 0) {
+                //枷锁
+                System.out.println("缓存中没有数据");
+                //定义上锁的key
+                String skuLockKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKULOCK_SUFFIX;
+                //执行set命令
+                String lockKey = jedis.set(skuLockKey, "Ok", "NX", "PX", ManageConst.SKULOCK_EXPIRE_PX);
+                if ("OK".equals(lockKey)) {
+                    //此时枷锁成功
+                    skuInfo = getSkuInfoDB(skuId);
+                    String skuRedisStr = JSON.toJSONString(skuInfo);
+                    jedis.setex(skuKey, ManageConst.SKUKEY_TIMEOUT, skuRedisStr);
+                    //删除锁
+                    jedis.del(skuLockKey);
+                    return skuInfo;
+                } else {
+                    //等待
+                    Thread.sleep(1000);
+                    //再次调用
+                    return getSkuInfo(skuId);
+                }
+            } else {
+                skuInfo = JSON.parseObject(skuJson, SkuInfo.class);
+                return skuInfo;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (jedis != null) {
+                jedis.close();
+            }
+        }
+        return getSkuInfoDB(skuId);
+    }
+
+    /**
+     * 根据skuId从数据库中查询skuInfo
+     *
+     * @param skuId
+     * @return
+     */
+    private SkuInfo getSkuInfoDB(String skuId) {
         SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
         skuInfo.setSkuImageList(getSkuImageBySkuId(skuId));
         return skuInfo;
@@ -303,6 +426,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据skuId获取SkuImage集合
+     *
      * @param skuId
      * @return
      */
@@ -315,6 +439,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据skuId，spuId查询销售属性集合
+     *
      * @param skuInfo
      * @return
      */
@@ -325,6 +450,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据spuId查询数据
+     *
      * @param spuId
      * @return
      */
@@ -335,6 +461,7 @@ public class ManageServiceImpl implements ManageService {
 
     /**
      * 根据spuId查询数据
+     *
      * @param spuId
      * @return
      */
@@ -360,6 +487,44 @@ public class ManageServiceImpl implements ManageService {
 //        BaseAttrValue baseAttrValue = new BaseAttrValue();
 //        baseAttrValue.setAttrId(attrId);
 //        return baseAttrValueMapper.select(baseAttrValue);
+//    }
+
+//    public SkuInfo getSkuInfoOld(String skuId) {
+//        /*
+//            redis:五种数据类型使用场景
+//            string：短信验证码，存储一个变量
+//            hash：json字符串{对象转换的字符串}
+//            list：lpush，pop队列使用
+//            set：去重，交集，并集，补集，差集 ... 不重复
+//            zSet：评分，排序
+//         */
+//        Jedis jedis = null;
+//        SkuInfo skuInfo = null;
+//        try {
+//            //获取jedis
+//            jedis = redisUtil.getJedis();
+//            //定义key
+//            String skuKey = ManageConst.SKUKEY_PREFIX + skuId + ManageConst.SKUKEY_SUFFIX;
+//            //判断redis中是否有key
+//            if (jedis.exists(skuKey)) {
+//                //如果有从缓存中获取
+//                String skuJson = jedis.get(skuKey);
+//                skuInfo = JSON.parseObject(skuJson, SkuInfo.class);
+//                return skuInfo;
+//            } else {
+//                //如果没有从db获取并将数据放入缓存 并设置过期时间
+//                skuInfo = getSkuInfoDB(skuId);
+//                jedis.setex(skuKey, ManageConst.SKUKEY_TIMEOUT, JSON.toJSONString(skuInfo));
+//                return skuInfo;
+//            }
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        } finally {
+//            if (jedis != null) {
+//                jedis.close();
+//            }
+//        }
+//        return getSkuInfoDB(skuId);
 //    }
 
 }
