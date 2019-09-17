@@ -2,12 +2,16 @@ package com.atguigu.gmall.manage.service.impl;
 
 import com.alibaba.dubbo.config.annotation.Service;
 import com.atguigu.gmall.bean.*;
+import com.atguigu.gmall.config.RedisUtil;
 import com.atguigu.gmall.manage.mapper.*;
 import com.atguigu.gmall.service.ManageService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.annotation.Transactional;
+import redis.clients.jedis.Jedis;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ManageServiceImpl implements ManageService {
@@ -53,6 +57,9 @@ public class ManageServiceImpl implements ManageService {
 
     @Autowired
     private SkuSaleAttrValueMapper skuSaleAttrValueMapper;
+
+    @Autowired
+    private RedisUtil redisUtil;
 
     /**
      * 获取所有一级分类数据
@@ -167,11 +174,19 @@ public class ManageServiceImpl implements ManageService {
         return spuInfoMapper.select(spuInfo);
     }
 
+    /**
+     * 获取所有销售属性数据
+     * @return
+     */
     @Override
     public List<BaseSaleAttr> baseSaleAttrList() {
         return baseSaleAttrMapper.selectAll();
     }
 
+    /**
+     * 保存spuInfo
+     * @param spuInfo
+     */
     @Override
     @Transactional
     public void saveSpuInfo(SpuInfo spuInfo) {
@@ -210,16 +225,30 @@ public class ManageServiceImpl implements ManageService {
         }
     }
 
+    /**
+     * 根据sup图片对象获取spu图片集合
+     * @param spuImage sup图片对象
+     * @return
+     */
     @Override
     public List<SpuImage> spuImageList(SpuImage spuImage) {
         return spuImageMapper.select(spuImage);
     }
 
+    /**
+     * 根据spuId获取销售属性集合
+     * @param spuId
+     * @return
+     */
     @Override
     public List<SpuSaleAttr> spuSaleAttrList(String spuId) {
         return spuSaleAttrMapper.selectSpuSaleAttrList(spuId);
     }
 
+    /**
+     * 保存skuInfo数据
+     * @param skuInfo
+     */
     @Override
     @Transactional
     public void saveSkuInfo(SkuInfo skuInfo) {
@@ -256,13 +285,27 @@ public class ManageServiceImpl implements ManageService {
         }
     }
 
+    /**
+     * 根据skuId查询skuInfo
+     * @param skuId
+     * @return
+     */
     @Override
     public SkuInfo getSkuInfo(String skuId) {
+        Jedis jedis = redisUtil.getJedis();
+        jedis.set("111", "123");
+        jedis.close();
+
         SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
         skuInfo.setSkuImageList(getSkuImageBySkuId(skuId));
         return skuInfo;
     }
 
+    /**
+     * 根据skuId获取SkuImage集合
+     * @param skuId
+     * @return
+     */
     @Override
     public List<SkuImage> getSkuImageBySkuId(String skuId) {
         SkuImage skuImage = new SkuImage();
@@ -270,9 +313,41 @@ public class ManageServiceImpl implements ManageService {
         return skuImageMapper.select(skuImage);
     }
 
+    /**
+     * 根据skuId，spuId查询销售属性集合
+     * @param skuInfo
+     * @return
+     */
     @Override
     public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(SkuInfo skuInfo) {
         return spuSaleAttrMapper.selectSpuSaleAttrListCheckBySku(skuInfo.getId(), skuInfo.getSpuId());
+    }
+
+    /**
+     * 根据spuId查询数据
+     * @param spuId
+     * @return
+     */
+    @Override
+    public List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId) {
+        return skuSaleAttrValueMapper.selectSkuSaleAttrValueListBySpu(spuId);
+    }
+
+    /**
+     * 根据spuId查询数据
+     * @param spuId
+     * @return
+     */
+    @Override
+    public Map getSkuValueIdsMap(String spuId) {
+        List<Map> mapList = skuSaleAttrValueMapper.getSaleAttrValuesBySpu(spuId);
+        Map<String, String> skuValueIds = new HashMap<>();
+        for (Map map : mapList) {
+            String skuId = (Long) map.get("sku_id") + "";
+            String valueIds = (String) map.get("value_ids");
+            skuValueIds.put(valueIds, skuId);
+        }
+        return skuValueIds;
     }
 
     /**
