@@ -71,7 +71,7 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 获取所有一级分类数据
      *
-     * @return
+     * @return List<BaseCatalog1>
      */
     @Override
     public List<BaseCatalog1> getBaseCatalog1() {
@@ -82,7 +82,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据一级分类Id查询所有二级分类
      *
      * @param catalog1Id 一级分类Id
-     * @return
+     * @return List<BaseCatalog2>
      */
     @Override
     public List<BaseCatalog2> getBaseCatalog2(String catalog1Id) {
@@ -98,7 +98,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据二级分类Id查询所有三级分类
      *
      * @param catalog2Id 二级分类Id
-     * @return
+     * @return List<BaseCatalog3>
      */
     @Override
     public List<BaseCatalog3> getBaseCatalog3(String catalog2Id) {
@@ -111,7 +111,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据三级分类Id查询平台属性集合
      *
      * @param catalog3Id 三级分类Id
-     * @return
+     * @return List<BaseAttrInfo>
      */
     @Override
     public List<BaseAttrInfo> getAttrList(String catalog3Id) {
@@ -124,7 +124,7 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 保存或修改平台属性数据
      *
-     * @param baseAttrInfo
+     * @param baseAttrInfo baseAttrInfo
      */
     @Transactional
     @Override
@@ -157,7 +157,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据平台属性id查询平台属性值集合
      *
      * @param attrId 平台属性id
-     * @return
+     * @return BaseAttrInfo
      */
     @Override
     public BaseAttrInfo getAttrInfo(String attrId) {
@@ -181,7 +181,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据spuInfo对象属性获取spuInfo集合
      *
      * @param spuInfo 对象属性
-     * @return
+     * @return List<SpuInfo>
      */
     @Override
     public List<SpuInfo> spuList(SpuInfo spuInfo) {
@@ -191,7 +191,7 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 获取所有销售属性数据
      *
-     * @return
+     * @return List<BaseSaleAttr>
      */
     @Override
     public List<BaseSaleAttr> baseSaleAttrList() {
@@ -201,7 +201,7 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 保存spuInfo
      *
-     * @param spuInfo
+     * @param spuInfo spuInfo
      */
     @Override
     @Transactional
@@ -245,7 +245,7 @@ public class ManageServiceImpl implements ManageService {
      * 根据sup图片对象获取spu图片集合
      *
      * @param spuImage sup图片对象
-     * @return
+     * @return List<SpuImage>
      */
     @Override
     public List<SpuImage> spuImageList(SpuImage spuImage) {
@@ -255,8 +255,8 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据spuId获取销售属性集合
      *
-     * @param spuId
-     * @return
+     * @param spuId spuId
+     * @return List<SpuSaleAttr>
      */
     @Override
     public List<SpuSaleAttr> spuSaleAttrList(String spuId) {
@@ -266,7 +266,7 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 保存skuInfo数据
      *
-     * @param skuInfo
+     * @param skuInfo skuInfo
      */
     @Override
     @Transactional
@@ -307,8 +307,8 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据skuId从redis中查询skuInfo
      *
-     * @param skuId
-     * @return
+     * @param skuId skuId
+     * @return SkuInfo
      */
     @Override
     public SkuInfo getSkuInfo(String skuId) {
@@ -319,20 +319,21 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据skuId从redis中查询skuInfo Redisson锁
      *
-     * @param skuId
-     * @return
+     * @param skuId skuId
+     * @return SkuInfo
      */
     private SkuInfo getSkuInfoRedisson(String skuId) {
-        Config config = new Config();
-        config.useSingleServer().setAddress("redis://192.168.187.130:6379");
-        RedissonClient redissonClient = Redisson.create(config);
-        //使用Redisson调用getLock
-        RLock lock = redissonClient.getLock("myLock");
-        //加锁
-        lock.lock(10, TimeUnit.SECONDS);
         Jedis jedis = null;
         SkuInfo skuInfo = null;
+        RLock lock = null;
         try {
+            Config config = new Config();
+            config.useSingleServer().setAddress("redis://192.168.187.130:6379");
+            RedissonClient redissonClient = Redisson.create(config);
+            //使用Redisson调用getLock
+            lock = redissonClient.getLock("myLock");
+            //加锁
+            lock.lock(10, TimeUnit.SECONDS);
             //获取jedis
             jedis = redisUtil.getJedis();
             //定义key
@@ -355,8 +356,10 @@ public class ManageServiceImpl implements ManageService {
             if (jedis != null) {
                 jedis.close();
             }
-            //解锁
-            lock.unlock();
+            if (lock != null) {
+                //解锁
+                lock.unlock();
+            }
         }
         return getSkuInfoDB(skuId);
     }
@@ -364,8 +367,8 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据skuId从redis中查询skuInfo Jedis锁
      *
-     * @param skuId
-     * @return
+     * @param skuId skuId
+     * @return SkuInfo
      */
     private SkuInfo getSkuInfoJedis(String skuId) {
         Jedis jedis = null;
@@ -415,20 +418,24 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据skuId从数据库中查询skuInfo
      *
-     * @param skuId
-     * @return
+     * @param skuId skuId
+     * @return SkuInfo
      */
     private SkuInfo getSkuInfoDB(String skuId) {
         SkuInfo skuInfo = skuInfoMapper.selectByPrimaryKey(skuId);
         skuInfo.setSkuImageList(getSkuImageBySkuId(skuId));
+        SkuAttrValue skuAttrValue = new SkuAttrValue();
+        skuAttrValue.setSkuId(skuId);
+        List<SkuAttrValue> skuAttrValueList = skuAttrValueMapper.select(skuAttrValue);
+        skuInfo.setSkuAttrValueList(skuAttrValueList);
         return skuInfo;
     }
 
     /**
      * 根据skuId获取SkuImage集合
      *
-     * @param skuId
-     * @return
+     * @param skuId skuId
+     * @return List<SkuImage>
      */
     @Override
     public List<SkuImage> getSkuImageBySkuId(String skuId) {
@@ -440,8 +447,8 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据skuId，spuId查询销售属性集合
      *
-     * @param skuInfo
-     * @return
+     * @param skuInfo skuInfo
+     * @return List<SpuSaleAttr>
      */
     @Override
     public List<SpuSaleAttr> getSpuSaleAttrListCheckBySku(SkuInfo skuInfo) {
@@ -451,8 +458,8 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据spuId查询数据
      *
-     * @param spuId
-     * @return
+     * @param spuId spuId
+     * @return List<SkuSaleAttrValue>
      */
     @Override
     public List<SkuSaleAttrValue> getSkuSaleAttrValueListBySpu(String spuId) {
@@ -462,26 +469,26 @@ public class ManageServiceImpl implements ManageService {
     /**
      * 根据spuId查询数据
      *
-     * @param spuId
-     * @return
+     * @param spuId spuId
+     * @return Map
      */
     @Override
     public Map getSkuValueIdsMap(String spuId) {
         List<Map> mapList = skuSaleAttrValueMapper.getSaleAttrValuesBySpu(spuId);
         Map<String, String> skuValueIds = new HashMap<>();
         for (Map map : mapList) {
-            String skuId = (Long) map.get("sku_id") + "";
+            String skuId = map.get("sku_id") + "";
             String valueIds = (String) map.get("value_ids");
             skuValueIds.put(valueIds, skuId);
         }
         return skuValueIds;
     }
 
-    /**
-     * 根据平台属性id查询平台属性对象
-     * @param attrId 平台属性id
-     * @return
-     */
+//    /**
+//     * 根据平台属性id查询平台属性对象
+//     * @param attrId 平台属性id
+//     * @return
+//     */
 //    @Override
 //    public List<BaseAttrValue> getAttrValueList(String attrId) {
 //        BaseAttrValue baseAttrValue = new BaseAttrValue();
