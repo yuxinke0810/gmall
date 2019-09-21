@@ -4,6 +4,7 @@ import com.alibaba.dubbo.config.annotation.Reference;
 import com.alibaba.fastjson.JSON;
 import com.atguigu.gmall.bean.SkuInfo;
 import com.atguigu.gmall.bean.SpuSaleAttr;
+import com.atguigu.gmall.service.ListService;
 import com.atguigu.gmall.service.ManageService;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -18,6 +19,9 @@ public class ItemController {
 
     @Reference
     private ManageService manageService;
+
+    @Reference
+    private ListService listService;
 
     @RequestMapping("/{skuId}.html")
     public String item(@PathVariable String skuId, HttpServletRequest request){
@@ -65,12 +69,13 @@ public class ItemController {
         String valuesSkuJson = JSON.toJSONString(skuValueIdsMap);
         request.setAttribute("valuesSkuJson", valuesSkuJson);
 //============================================================================================================
+        //将销售属性，销售属性值集合放入作用域中
+        request.setAttribute("spuSaleAttrList", spuSaleAttrList);
         //保存到作用域
         request.setAttribute("skuInfo", skuInfo);
         //将图片保存到作用域中
 //        request.setAttribute("skuImageList", skuImageList);
-        //将销售属性，销售属性值集合放入作用域中
-        request.setAttribute("spuSaleAttrList", spuSaleAttrList);
+        listService.incrHotScore(skuId);
         return "item";
     }
 

@@ -135,4 +135,10 @@ public interface ManageService {
      */
     Map getSkuValueIdsMap(String spuId);
 
+    /**
+     * 根据平台属性值Id查询
+     * @param attrValueIdList attrValueIdList
+     * @return List<BaseAttrInfo>
+     */
+    List<BaseAttrInfo> getAttrList(List<String> attrValueIdList);
 }

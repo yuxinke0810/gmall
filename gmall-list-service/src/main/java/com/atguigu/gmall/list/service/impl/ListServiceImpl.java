@@ -4,11 +4,13 @@ import com.alibaba.dubbo.config.annotation.Service;
 import com.atguigu.gmall.bean.SkuLsInfo;
 import com.atguigu.gmall.bean.SkuLsParams;
 import com.atguigu.gmall.bean.SkuLsResult;
+import com.atguigu.gmall.config.RedisUtil;
 import com.atguigu.gmall.service.ListService;
 import io.searchbox.client.JestClient;
 import io.searchbox.core.Index;
 import io.searchbox.core.Search;
 import io.searchbox.core.SearchResult;
+import io.searchbox.core.Update;
 import io.searchbox.core.search.aggregation.MetricAggregation;
 import io.searchbox.core.search.aggregation.TermsAggregation;
 import org.elasticsearch.index.query.BoolQueryBuilder;
@@ -21,6 +23,7 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.highlight.HighlightBuilder;
 import org.elasticsearch.search.sort.SortOrder;
 import org.springframework.beans.factory.annotation.Autowired;
+import redis.clients.jedis.Jedis;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -32,6 +35,9 @@ public class ListServiceImpl implements ListService {
 
     @Autowired
     private JestClient jestClient;
+
+    @Autowired
+    private RedisUtil redisUtil;
 
     public static final String BS_INDEX = "gmall";
 
@@ -74,6 +80,47 @@ public class ListServiceImpl implements ListService {
         //获取结果集
         SkuLsResult skuLsResult = makeResultForSearch(searchResult, skuLsParams);
         return skuLsResult;
+    }
+
+    /**
+     * 记录每个商品被访问的次数
+     * @param skuId skuId
+     */
+    @Override
+    public void incrHotScore(String skuId) {
+        //获取jedis
+        Jedis jedis = redisUtil.getJedis();
+        //定义一个key
+        String hotKey = "hotScore";
+        //保存数据
+        Double count = jedis.zincrby(hotKey, 1, "skuId" + skuId);
+        //按照一定的规则来更新es
+        if (count % 10 == 0) {
+            //es更新语句
+            updateHotScore(skuId, Math.round(count));
+        }
+    }
+
+    /**
+     * 更新es
+     * @param skuId
+     * @param hotScore
+     */
+    private void updateHotScore(String skuId, long hotScore) {
+        //定义dsl语句
+        String upd = "{\n" +
+                "  \"doc\": {\n" +
+                "    \"hotScore\": " + hotScore + "\n" +
+                "  }\n" +
+                "}\n";
+        //定义动作
+        Update update = new Update.Builder(upd).index(BS_INDEX).type(BS_TYPE).id(skuId).build();
+        //执行
+        try {
+            jestClient.execute(update);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 
     /**
