@@ -12,7 +12,7 @@ public class GmallListServiceApplication {
 
     public static void main(String[] args) {
         //配置dubbo.qos.port端口
-        System.setProperty(Constants.QOS_PORT,"33333");
+        System.setProperty(Constants.QOS_PORT,"22223");
         //配置dubbo.qos.accept.foreign.ip是否关闭远程连接
         System.setProperty(Constants.ACCEPT_FOREIGN_IP,"false");
         SpringApplication.run(GmallListServiceApplication.class, args);

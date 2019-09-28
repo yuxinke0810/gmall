@@ -59,7 +59,7 @@
             <ul class="header_ul_right">
                 <li style="border: 0;">
                     <a href="http://passport.atguigu.com/index.html" class="aa">
-                        <span th:if="${nickName} != null" th:text="${nickName}">
+                        <span th:text="${nickName}!=null?${nickName}:'你好，请登录'" >
                             你好，请登录
                         </span>
                     </a>
@@ -233,45 +233,16 @@
                                     摩卡金
                                 </div>
                             </dd>
-<!--                            <dd class="">-->
-<!--                                <div>-->
-<!--                                    太空银-->
-<!--                                </div>-->
-<!--                            </dd>-->
                         </dl>
                     </div>
-<!--                    <div class="box-attr-2 clear">-->
-<!--                        <dl>-->
-<!--                            <dt>选择版本</dt>-->
-<!--                            <dd>-->
-<!--                                <a href="#">标准版</a>-->
-<!--                            </dd>-->
-<!--                            <dd>-->
-<!--                                <a href="#">套装版</a>-->
-<!--                            </dd>-->
-<!--                        </dl>-->
-<!--                    </div>-->
-                    <!--
-                                                <div class="box-attr-2 clear">
-                                                    <dl>
-                                                        <dt>选择内存</dt>
-                                                        <dd>
-                                                            <a href="#">64GB</a>
-                                                        </dd>
-                                                        <dd>
-                                                            <a href="#">128GB</a>
-                                                        </dd>
-                                                    </dl>
-                                                </div>-->
                     <br/>
                 </div>
 
                 <div class="box-btns clear">
                     <div class="box-btns-one">
                         <form id="itemForm" action="http://cart.gmall.com/addToCart" method="post">
-                            <input type="text" name="num" id="" value="1"/>
-                            <input type="hidden" name="skuId"/>
-
+                            <input type="text" name="skuNum" id="" value="1"/>
+                            <input type="hidden" name="skuId" th:value="${skuInfo.id}" />
                             <div class="box-btns-one1">
 
                                 <div>
